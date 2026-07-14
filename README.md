@@ -220,11 +220,15 @@ The complete pipeline is orchestrated using:
 
 ## ⚡ Energy Consumption Dashboard
 
+<img width="6000" height="2941" alt="executive_dashboard" src="https://github.com/user-attachments/assets/2d5da4fd-d5a2-4bdc-9ae6-6982ee9f6fce" />
+
 Tracks total and average energy usage across regions, cities, and customer categories.
 
 ---
 
 ## 🌦 Weather Impact Dashboard
+![Uploading weather_impact_dashboard.jpg…]()
+
 
 Analyzes the relationship between weather conditions and energy consumption.
 
@@ -232,11 +236,15 @@ Analyzes the relationship between weather conditions and energy consumption.
 
 ## 🔌 Device Monitoring Dashboard
 
+<img width="6000" height="5125" alt="billing_analytics_dashboard" src="https://github.com/user-attachments/assets/eb53f3ec-9e5e-4f90-81a2-420317519a49" />
+
 Monitors runtime, efficiency, and operational health of connected devices.
 
 ---
 
 ## 💰 Billing Analytics Dashboard
+<img width="6000" height="5125" alt="billing_analytics_dashboard" src="https://github.com/user-attachments/assets/7170bb6e-5986-4d9f-8af3-424afece76f8" />
+
 
 Analyzes billing, tariff plans, and revenue across regions and customer categories.
 
