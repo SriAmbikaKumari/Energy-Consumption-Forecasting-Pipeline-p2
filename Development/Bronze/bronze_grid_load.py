@@ -1,0 +1,184 @@
+# Databricks notebook source
+# MAGIC %sql
+# MAGIC CREATE SCHEMA IF NOT EXISTS bronze.bronze_sch;
+# MAGIC
+# MAGIC CREATE SCHEMA IF NOT EXISTS silver.silver_sch;
+# MAGIC
+# MAGIC CREATE SCHEMA IF NOT EXISTS gold.gold_sch;
+
+# COMMAND ----------
+
+# Configure connection to your Azure Storage account
+spark.conf.set(
+    "fs.azure.account.key.energyystorage.dfs.core.windows.net",
+    "LWV4YcS2Hz53IcGZj27TCE9KA2bw91fUX1QLs2yrIIz1eqR1eCTCEhcbjdpn0CxkqPEBXTY6kmJj+AStI88gGg=="
+)
+
+print("Storage account authentication configured successfully.")
+
+# COMMAND ----------
+
+base_transformed_path = "abfss://energycontainer@energyystorage.dfs.core.windows.net/transformed/"
+
+grid_df = (
+    spark.read
+    .format("parquet")
+    .load(base_transformed_path + "grid_load_stream_v2.parquet")
+)
+
+display(grid_df)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 4: Add Bronze Metadata
+
+# COMMAND ----------
+
+from pyspark.sql.functions import current_timestamp, expr
+
+grid_bronze = (
+    grid_df
+    .withColumn("bronze_ingestion_time", current_timestamp())
+    .withColumn("source_file", expr("_metadata.file_path"))
+    .withColumn("batch_id", expr("uuid()"))
+)
+
+display(grid_bronze)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 5: Watermark
+
+# COMMAND ----------
+
+grid_bronze = (
+    grid_bronze
+    .withWatermark("reading_timestamp", "2 hours")
+)
+display(grid_bronze)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 6: Enable Schema Evolution
+
+# COMMAND ----------
+
+spark.conf.set(
+    "spark.databricks.delta.schema.autoMerge.enabled",
+    "true"
+)
+
+print("Schema evolution enabled successfully.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 7: Load Bronze Table
+
+# COMMAND ----------
+
+target_table = "bronze.bronze_sch.bronze_grid_load"
+
+try:
+
+    (
+        grid_bronze.write
+        .format("delta")
+        .mode("append")
+        .option("mergeSchema", "true")
+        .saveAsTable(target_table)
+    )
+
+    print(f"Successfully loaded into {target_table}")
+
+except Exception as e:
+
+    print(f"Bronze Load Failed : {target_table}")
+    print(e)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 8: View Delta History
+
+# COMMAND ----------
+
+spark.sql(f"DESCRIBE HISTORY {target_table}").display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 9: Create Audit Table
+
+# COMMAND ----------
+
+# Create the central log table if it doesn't exist yet
+spark.sql("""
+    CREATE TABLE IF NOT EXISTS bronze.bronze_sch.bronze_audit_logs (
+        process_name STRING,
+        source_file STRING,
+        target_table STRING,
+        records_processed LONG,
+        status STRING,
+        error_message STRING,
+        log_timestamp TIMESTAMP
+    )
+    USING delta
+""")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 10: Create Error Log Table
+
+# COMMAND ----------
+
+from pyspark.sql.functions import current_timestamp, expr
+from datetime import datetime
+import sys
+
+PROCESS_NAME = "Ingest_grid_load"
+FILE_NAME = "grid_load_stream_v2.parquet"
+TARGET_TABLE = "bronze.bronze_sch.bronze_grid_load"
+
+try:
+    # 1. Read Data (Assuming energy_df is your spark.read dataframe)
+    grid_bronze = (
+        grid_df
+        .withColumn("bronze_ingestion_time", current_timestamp())
+        .withColumn("source_file", expr("_metadata.file_path"))
+    )
+    
+    # 2. Write Data to Delta
+    grid_bronze.write \
+        .format("delta") \
+        .mode("append") \
+        .option("mergeSchema", "true") \
+        .saveAsTable(TARGET_TABLE)
+        
+    # 3. Capture Row Count for Audit
+    inserted_rows = grid_bronze.count()
+    
+    # 4. Write SUCCESS Log (Using standard datetime.now() instead of the PySpark function)
+    current_time = datetime.now()
+    audit_df = spark.createDataFrame([(
+        PROCESS_NAME, FILE_NAME, TARGET_TABLE, inserted_rows, "SUCCESS", None, current_time
+    )], schema="process_name STRING, source_file STRING, target_table STRING, records_processed LONG, status STRING, error_message STRING, log_timestamp TIMESTAMP")
+    
+    audit_df.write.format("delta").mode("append").saveAsTable("bronze.bronze_sch.bronze_audit_logs")
+    print(f"Successfully processed {inserted_rows} records.")
+
+except Exception as e:
+    # 5. Write FAILURE Log if anything breaks
+    error_msg = str(e)
+    current_time = datetime.now()
+    
+    error_df = spark.createDataFrame([(
+        PROCESS_NAME, FILE_NAME, TARGET_TABLE, 0, "FAILED", error_msg, current_time
+    )], schema="process_name STRING, source_file STRING, target_table STRING, records_processed LONG, status STRING, error_message STRING, log_timestamp TIMESTAMP")
+    
+    error_df.write.format("delta").mode("append").saveAsTable("bronze2.bronze_sch.bronze_audit_logs")
+    print(f"Pipeline Failed: {error_msg}")
