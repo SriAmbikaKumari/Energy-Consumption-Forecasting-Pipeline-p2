@@ -25,9 +25,7 @@ It follows the **Medallion Architecture** to progressively improve data quality 
 
 # 🏛️ Medallion Architecture
 
-<p align="center">
-<img src="Architecture/Medallion_Architecture.png" width="1000">
-</p>
+<img width="1536" height="1024" alt="Medallion_architectue" src="https://github.com/user-attachments/assets/88fd0cf8-cacf-4e67-9acf-1c19e75860c9" />
 
 ---
 
