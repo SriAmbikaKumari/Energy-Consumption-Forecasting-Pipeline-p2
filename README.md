@@ -227,7 +227,8 @@ Tracks total and average energy usage across regions, cities, and customer categ
 ---
 
 ## 🌦 Weather Impact Dashboard
-![Uploading weather_impact_dashboard.jpg…]()
+<img width="6000" height="5125" alt="weather_impact_dashboard" src="https://github.com/user-attachments/assets/c5f9e82d-280a-434a-8da2-05ebcd98e8b4" />
+
 
 
 Analyzes the relationship between weather conditions and energy consumption.
